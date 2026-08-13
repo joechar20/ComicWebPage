@@ -54,6 +54,18 @@ const readerStatus = document.getElementById('reader-status');
 const navDate      = document.getElementById('nav-date');
 const btnPrev      = document.getElementById('btn-prev');
 const btnNext      = document.getElementById('btn-next');
+const datePicker   = document.getElementById('date-picker');
+
+// Open native date picker when the date button is tapped
+document.getElementById('nav-date').addEventListener('click', () => {
+  datePicker.value = currentDate;
+  if (datePicker.showPicker) datePicker.showPicker();
+  else datePicker.click();
+});
+
+datePicker.addEventListener('change', () => {
+  if (datePicker.value && datePicker.value !== currentDate) showDate(datePicker.value);
+});
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 

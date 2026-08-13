@@ -251,7 +251,38 @@ body {
   font-weight: 500;
 }
 
-/* ── Loading state ──────────────────────────────────────────────────────── */
+#nav-date {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  background: none;
+  border: 1px dotted var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+#nav-date:active { background: var(--border); }
+
+/* ── Loading state ───────────────────────────────────────────────────────────── */
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid #444;
+  border-top-color: #aaa;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Hidden but focusable so showPicker() works */
+#date-picker {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
 .spinner {
   width: 32px; height: 32px;
   border: 3px solid #444;
