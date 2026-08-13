@@ -12,9 +12,16 @@ import requests
 import cloudscraper
 import json
 import sys
+import socket
 import datetime
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from bs4 import BeautifulSoup
+
+# Hard wall-clock timeout for any single HTTP request (SSL hangs bypass normal timeouts)
+_REQUEST_TIMEOUT = 25
+
+socket.setdefaulttimeout(20)
 
 HEADERS = {
     'User-Agent': (
@@ -24,8 +31,13 @@ HEADERS = {
     )
 }
 
-# GoComics uses Cloudflare; cloudscraper handles the JS challenge automatically
-_gocomics_scraper = cloudscraper.create_scraper()
+
+def _do_fetch(page_url, source):
+    """Blocking fetch — called inside a thread so the caller can enforce a hard timeout."""
+    if source == 'gocomics':
+        scraper = cloudscraper.create_scraper()
+        return scraper.get(page_url, timeout=(8, 15))
+    return requests.get(page_url, headers=HEADERS, timeout=(8, 15))
 
 def load_config():
     with open('comics.json', 'r', encoding='utf-8') as f:
@@ -41,11 +53,13 @@ def build_page_url(comic, date):
 def extract_image_url(page_url, source):
     """Return the comic image URL from the page, or None on failure."""
     try:
-        if source == 'gocomics':
-            resp = _gocomics_scraper.get(page_url, timeout=20)
-        else:
-            resp = requests.get(page_url, headers=HEADERS, timeout=20)
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_do_fetch, page_url, source)
+            resp = future.result(timeout=_REQUEST_TIMEOUT)
         resp.raise_for_status()
+    except FuturesTimeout:
+        print(f"    TIMEOUT: {page_url}")
+        return None
     except Exception as e:
         print(f"    FETCH ERROR: {e}")
         return None
