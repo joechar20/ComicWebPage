@@ -1,17 +1,7 @@
-# ComicScraperPython
-Scrape Comics using Python Script
+# ComicWebPage
+Uses Github actions to scrape comics daily 
 
-## scripts
-1: ComicScrape_all.py
- - Scrapes comics for current date -1 day or specified date from list in script
- - example calls: 
-    python ComicScrape_all.py
-    python ComicScrape_all.py 2024 02 29
-
-2: ComicScrape_all-troubleshoot.py
- - Used to troubleshoot a single comic issue, all error handling is removed
- 
- ## Comics currently scraped
+## Comics currently scraped
 Comic Title, Comic URL
  - andertoons, 'https://www.gocomics.com/andertoons/'  
  - babyblues, 'https://www.gocomics.com/babyblues/'
