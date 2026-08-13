@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reader</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="reader-page">
+
+  <header id="reader-header">
+    <button id="btn-back" onclick="window.location.href='index.html'" title="Dashboard">‹</button>
+    <span id="header-title"></span>
+  </header>
+
+  <main id="reader-main">
+    <img id="comic-img" alt="">
+    <div id="reader-status"></div>
+  </main>
+
+  <nav id="reader-nav">
+    <button id="btn-prev" disabled>← Prev</button>
+    <span   id="nav-date"></span>
+    <button id="btn-next">Next →</button>
+  </nav>
+
+  <script src="js/state.js"></script>
+  <script src="js/reader.js"></script>
+</body>
+</html>

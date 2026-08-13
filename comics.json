@@ -1,0 +1,31 @@
+{
+  "start_date": "2026-08-10",
+  "prefetch_days": 3,
+  "default_sort": ["orientation", "title", "date"],
+  "comics": [
+    { "id": "andertoons",      "title": "Andertoons",         "url": "https://www.gocomics.com/andertoons/",         "source": "gocomics",       "orientation": "portrait" },
+    { "id": "carpediem",       "title": "Carpe Diem",         "url": "https://comicskingdom.com/carpe-diem/",        "source": "comicskingdom",  "orientation": "portrait" },
+    { "id": "dennisthemenace", "title": "Dennis the Menace",  "url": "https://comicskingdom.com/dennis-the-menace/", "source": "comicskingdom",  "orientation": "portrait" },
+    { "id": "familycircus",    "title": "Family Circus",      "url": "https://comicskingdom.com/family-circus/",     "source": "comicskingdom",  "orientation": "portrait" },
+    { "id": "looseparts",      "title": "Loose Parts",        "url": "https://www.gocomics.com/looseparts/",         "source": "gocomics",       "orientation": "portrait" },
+    { "id": "marmaduke",       "title": "Marmaduke",          "url": "https://www.gocomics.com/marmaduke/",          "source": "gocomics",       "orientation": "portrait" },
+    { "id": "babyblues",       "title": "Baby Blues",         "url": "https://www.gocomics.com/babyblues/",          "source": "gocomics",       "orientation": "landscape" },
+    { "id": "bc",              "title": "B.C.",               "url": "https://www.gocomics.com/bc/",                 "source": "gocomics",       "orientation": "landscape" },
+    { "id": "beetlebailey",    "title": "Beetle Bailey",      "url": "https://comicskingdom.com/beetle-bailey-1/",   "source": "comicskingdom",  "orientation": "landscape" },
+    { "id": "bleeker",         "title": "Bleeker",            "url": "https://www.gocomics.com/bleeker/",            "source": "gocomics",       "orientation": "landscape", "weekdays_only": true },
+    { "id": "blondie",         "title": "Blondie",            "url": "https://comicskingdom.com/blondie/",           "source": "comicskingdom",  "orientation": "landscape" },
+    { "id": "bornloser",       "title": "The Born Loser",     "url": "https://www.gocomics.com/the-born-loser/",     "source": "gocomics",       "orientation": "landscape" },
+    { "id": "calvinandhobbes", "title": "Calvin and Hobbes",  "url": "https://www.gocomics.com/calvinandhobbes/",    "source": "gocomics",       "orientation": "landscape" },
+    { "id": "dogsofckennel",   "title": "Dogs of C-Kennel",   "url": "https://www.gocomics.com/dogsofckennel/",      "source": "gocomics",       "orientation": "landscape" },
+    { "id": "fminus",          "title": "F Minus",            "url": "https://www.gocomics.com/fminus/",             "source": "gocomics",       "orientation": "landscape" },
+    { "id": "frazz",           "title": "Frazz",              "url": "https://www.gocomics.com/frazz/",              "source": "gocomics",       "orientation": "landscape" },
+    { "id": "garfield",        "title": "Garfield",           "url": "https://www.gocomics.com/garfield/",           "source": "gocomics",       "orientation": "landscape" },
+    { "id": "hagarthehorrible","title": "Hagar the Horrible", "url": "https://comicskingdom.com/hagar-the-horrible/","source": "comicskingdom",  "orientation": "landscape" },
+    { "id": "overthehedge",    "title": "Over the Hedge",     "url": "https://www.gocomics.com/overthehedge/",       "source": "gocomics",       "orientation": "landscape" },
+    { "id": "peanuts",         "title": "Peanuts",            "url": "https://www.gocomics.com/peanuts/",            "source": "gocomics",       "orientation": "landscape" },
+    { "id": "pearlsbeforeswine","title": "Pearls Before Swine","url": "https://www.gocomics.com/pearlsbeforeswine/", "source": "gocomics",       "orientation": "landscape" },
+    { "id": "pickles",         "title": "Pickles",            "url": "https://www.gocomics.com/pickles/",            "source": "gocomics",       "orientation": "landscape" },
+    { "id": "wizardofid",      "title": "Wizard of Id",       "url": "https://www.gocomics.com/wizardofid/",         "source": "gocomics",       "orientation": "landscape" },
+    { "id": "zits",            "title": "Zits",               "url": "https://comicskingdom.com/zits/",              "source": "comicskingdom",  "orientation": "landscape" }
+  ]
+}

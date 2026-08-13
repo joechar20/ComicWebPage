@@ -1,0 +1,263 @@
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:           #f4f4f4;
+  --surface:      #ffffff;
+  --border:       #e0e0e0;
+  --text:         #1a1a1a;
+  --text-muted:   #666666;
+  --accent:       #007aff;
+  --caught-up:    #34a853;
+  --reader-bg:    #1a1a1a;
+  --header-h:     48px;
+  --nav-h:        56px;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Dashboard header ────────────────────────────────────────────────────── */
+.dash-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-h);
+  padding: 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.dash-header h1 { font-size: 1.1rem; font-weight: 700; }
+
+#btn-jump {
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ── Comic list ──────────────────────────────────────────────────────────── */
+#comic-list { padding-bottom: 24px; }
+
+.comic-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  min-height: 64px;
+  gap: 12px;
+}
+
+.comic-row:active { background: #f0f0f0; }
+.comic-row.caught-up { opacity: 0.55; cursor: default; }
+
+.comic-badge {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent);
+}
+
+.comic-row.caught-up .comic-badge { background: var(--caught-up); }
+
+.comic-info { flex: 1; min-width: 0; }
+.comic-title { display: block; font-weight: 600; font-size: 1rem; }
+.comic-next  { display: block; font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+.comic-arrow { color: var(--text-muted); font-size: 1.3rem; }
+
+.orientation-divider {
+  padding: 8px 16px 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  background: var(--bg);
+}
+
+/* ── Jump modal ─────────────────────────────────────────────────────────── */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  align-items: flex-end;
+}
+.modal-backdrop.open { display: flex; }
+
+.modal-sheet {
+  width: 100%;
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  padding: 24px 20px 40px;
+}
+
+.modal-sheet h2 { font-size: 1.1rem; margin-bottom: 20px; }
+
+.modal-row { margin-bottom: 16px; }
+.modal-row label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
+.modal-row select,
+.modal-row input[type="date"] {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  appearance: auto;
+}
+
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+.btn-primary {
+  flex: 1;
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  padding: 12px 20px;
+  font-size: 1rem;
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* ── Reader ─────────────────────────────────────────────────────────────── */
+.reader-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--reader-bg);
+}
+
+#reader-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: var(--header-h);
+  padding: 0 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+
+#btn-back {
+  font-size: 1.3rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--accent);
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+
+#header-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#reader-main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--reader-bg);
+  position: relative;
+}
+
+#comic-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+#comic-img.loaded { display: block; }
+
+#reader-status {
+  position: absolute;
+  color: #aaa;
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 20px;
+}
+
+#reader-nav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--nav-h);
+  padding: 0 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+#reader-nav button {
+  padding: 8px 18px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--accent);
+  color: #fff;
+  min-width: 80px;
+}
+
+#reader-nav button:disabled {
+  background: var(--border);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+#btn-next.done-btn { background: var(--caught-up); }
+
+#nav-date {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ── Loading state ──────────────────────────────────────────────────────── */
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid #444;
+  border-top-color: #aaa;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

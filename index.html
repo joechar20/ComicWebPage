@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comic Reader</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="dash-header">
+    <h1>Comics</h1>
+    <button id="btn-jump">Jump To</button>
+  </header>
+
+  <main id="comic-list">
+    <!-- Populated by dashboard.js -->
+  </main>
+
+  <!-- Jump modal -->
+  <div id="jump-modal" class="modal-backdrop">
+    <div class="modal-sheet">
+      <h2>Jump To Comic</h2>
+
+      <div class="modal-row">
+        <label for="jump-comic">Comic</label>
+        <select id="jump-comic"></select>
+      </div>
+
+      <div class="modal-row">
+        <label for="jump-date">Date</label>
+        <input type="date" id="jump-date">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btn-modal-close">Cancel</button>
+        <button class="btn-primary"   id="btn-jump-go">Go</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/state.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
