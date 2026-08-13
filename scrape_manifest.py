@@ -103,6 +103,16 @@ def scrape_date(config, date):
         with open(latest_path, 'w', encoding='utf-8') as f:
             json.dump(latest, f)
 
+def cleanup_old_manifests(keep_days=30):
+    cutoff = datetime.date.today() - datetime.timedelta(days=keep_days)
+    for f in sorted(Path('manifest').glob('????-??-??.json')):
+        try:
+            if datetime.date.fromisoformat(f.stem) < cutoff:
+                f.unlink()
+                print(f"  Removed old manifest: {f.name}")
+        except ValueError:
+            pass
+
 def daterange(start_str, end_str):
     start = datetime.date.fromisoformat(start_str)
     end   = datetime.date.fromisoformat(end_str)
@@ -129,6 +139,8 @@ def main():
 
     else:
         scrape_date(config, datetime.date.today())
+
+    cleanup_old_manifests(keep_days=30)
 
 if __name__ == '__main__':
     main()

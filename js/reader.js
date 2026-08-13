@@ -87,7 +87,12 @@ async function showDate(date) {
   comicImg.classList.remove('loaded');
 
   const manifest  = await fetchManifest(date);
-  const imageUrl  = manifest ? manifest[comicId] : null;
+  let imageUrl     = manifest ? manifest[comicId] : null;
+
+  if (!imageUrl) {
+    showStatus('<div class="spinner"></div>Not in manifest — fetching from source…');
+    imageUrl = await fetchImageUrlDynamic(comicId, date);
+  }
 
   if (!imageUrl) {
     showStatus('No comic available for this date.');
@@ -102,6 +107,50 @@ async function showDate(date) {
   comicImg.src    = imageUrl;
 
   prefetch(date, config.prefetch_days || 3);
+}
+
+// ── Dynamic fetch (for dates not in manifest) ───────────────────────────────
+
+// Cache dynamic lookups so back-navigation doesn't re-fetch
+const dynamicCache = {};
+
+async function fetchImageUrlDynamic(id, dateStr) {
+  const key = `${id}:${dateStr}`;
+  if (dynamicCache[key] !== undefined) return dynamicCache[key];
+
+  const comic = config && config.comics.find(c => c.id === id);
+  if (!comic) return (dynamicCache[key] = null);
+
+  const [y, m, d] = dateStr.split('-');
+  const pageUrl = comic.source === 'gocomics'
+    ? `${comic.url}${y}/${m}/${d}/`
+    : `${comic.url.replace(/\/$/, '')}/${dateStr}`;
+
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`;
+
+  try {
+    const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) return (dynamicCache[key] = null);
+    const html = await resp.text();
+    const doc  = new DOMParser().parseFromString(html, 'text/html');
+
+    const og = doc.querySelector('meta[property="og:image"]');
+    if (og && og.content && !og.content.includes('placeholder')) {
+      return (dynamicCache[key] = og.content);
+    }
+
+    // GoComics fallback: preload link with imagesrcset
+    if (comic.source === 'gocomics') {
+      const link = doc.querySelector('link[rel="preload"][as="image"]');
+      if (link) {
+        const src = link.getAttribute('imagesrcset') || link.getAttribute('href') || '';
+        const url = src.split(',')[0].trim().split(' ')[0].split('?')[0];
+        if (url) return (dynamicCache[key] = url);
+      }
+    }
+  } catch { /* network error or timeout */ }
+
+  return (dynamicCache[key] = null);
 }
 
 // ── Pre-fetch ─────────────────────────────────────────────────────────────────
