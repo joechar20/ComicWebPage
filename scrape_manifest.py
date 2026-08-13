@@ -9,6 +9,7 @@ Usage:
 """
 
 import requests
+import cloudscraper
 import json
 import sys
 import datetime
@@ -22,6 +23,9 @@ HEADERS = {
         'Chrome/125.0.0.0 Safari/537.36'
     )
 }
+
+# GoComics uses Cloudflare; cloudscraper handles the JS challenge automatically
+_gocomics_scraper = cloudscraper.create_scraper()
 
 def load_config():
     with open('comics.json', 'r', encoding='utf-8') as f:
@@ -37,7 +41,10 @@ def build_page_url(comic, date):
 def extract_image_url(page_url, source):
     """Return the comic image URL from the page, or None on failure."""
     try:
-        resp = requests.get(page_url, headers=HEADERS, timeout=20)
+        if source == 'gocomics':
+            resp = _gocomics_scraper.get(page_url, timeout=20)
+        else:
+            resp = requests.get(page_url, headers=HEADERS, timeout=20)
         resp.raise_for_status()
     except Exception as e:
         print(f"    FETCH ERROR: {e}")
