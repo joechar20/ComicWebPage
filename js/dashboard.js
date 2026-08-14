@@ -35,6 +35,14 @@ function formatDateShort(dateStr) {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function todayLocalIso() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 let config = null;
@@ -94,12 +102,10 @@ function renderList(comics, progress, startDate, latestDate) {
     const nextDate  = getNextDate(comic.id, progress, startDate);
     const caughtUp  = latestDate && nextDate > latestDate;
 
-    const row = document.createElement(caughtUp ? 'div' : 'a');
+    const row = document.createElement('a');
     row.className = 'comic-row' + (caughtUp ? ' caught-up' : '');
-
-    if (!caughtUp) {
-      row.href = `reader.html?comic=${encodeURIComponent(comic.id)}&date=${nextDate}`;
-    }
+    const targetDate = caughtUp ? latestDate : nextDate;
+    row.href = `reader.html?comic=${encodeURIComponent(comic.id)}&date=${targetDate}`;
 
     row.innerHTML = `
       <span class="comic-badge"></span>
@@ -109,7 +115,7 @@ function renderList(comics, progress, startDate, latestDate) {
           ? '✓ Caught up'
           : `Next: ${formatDateShort(nextDate)}`}</span>
       </div>
-      ${caughtUp ? '' : '<span class="comic-arrow">›</span>'}
+      <span class="comic-arrow">›</span>
     `;
 
     container.appendChild(row);
@@ -138,9 +144,9 @@ function populateJumpDropdown(comics) {
 
 document.getElementById('btn-jump').addEventListener('click', () => {
   document.getElementById('jump-modal').classList.add('open');
-  // Default date to start_date when config is ready
+  // Always default jump date to today when opening the modal.
   const dateInput = document.getElementById('jump-date');
-  if (config && !dateInput.value) dateInput.value = config.start_date;
+  dateInput.value = todayLocalIso();
 });
 
 document.getElementById('btn-modal-close').addEventListener('click', () => {
