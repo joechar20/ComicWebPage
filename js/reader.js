@@ -24,8 +24,12 @@ async function fetchLatestDate() {
 
 function addDays(dateStr, n) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(y, m - 1, d + n);
-  return date.toISOString().slice(0, 10);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + n);
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
 }
 
 function formatDateShort(dateStr) {
@@ -42,6 +46,7 @@ let currentDate = params.get('date')  || '';
 let config     = null;
 let comicMeta  = null;
 let latestDate = null;
+const SWIPE_NAV_ENABLED = false;
 
 // Keep Image objects alive so the browser cache retains the pixels
 const preloadedImages = {};
@@ -126,6 +131,49 @@ async function showDate(date) {
 // Cache dynamic lookups so back-navigation doesn't re-fetch
 const dynamicCache = {};
 
+async function fetchWithTimeout(url, timeoutMs) {
+  if (typeof AbortController === 'undefined') return fetch(url);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function extractImageUrlFromHtml(html, source) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  const og = doc.querySelector('meta[property="og:image"]');
+  if (og && og.content && !og.content.includes('placeholder')) {
+    return og.content;
+  }
+
+  if (source === 'gocomics') {
+    const link = doc.querySelector('link[rel="preload"][as="image"]');
+    if (link) {
+      const src = link.getAttribute('imagesrcset') || link.getAttribute('href') || '';
+      const url = src.split(',')[0].trim().split(' ')[0].split('?')[0];
+      if (url) return url;
+    }
+  }
+
+  // Regex fallback for proxy responses that transform the original HTML.
+  const ogAttr = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  if (ogAttr && ogAttr[1] && !ogAttr[1].includes('placeholder')) {
+    return ogAttr[1];
+  }
+
+  const ogLine = html.match(/og:image\s*[:=]\s*(https?:\/\/\S+)/i);
+  if (ogLine && ogLine[1]) {
+    return ogLine[1].replace(/["')\]]+$/, '');
+  }
+
+  return null;
+}
+
 async function fetchImageUrlDynamic(id, dateStr) {
   const key = `${id}:${dateStr}`;
   if (dynamicCache[key] !== undefined) return dynamicCache[key];
@@ -138,29 +186,22 @@ async function fetchImageUrlDynamic(id, dateStr) {
     ? `${comic.url}${y}/${m}/${d}/`
     : `${comic.url.replace(/\/$/, '')}/${dateStr}`;
 
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`;
+  const proxyUrls = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`,
+    `https://r.jina.ai/http://${pageUrl.replace(/^https?:\/\//, '')}`
+  ];
 
-  try {
-    const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
-    if (!resp.ok) return (dynamicCache[key] = null);
-    const html = await resp.text();
-    const doc  = new DOMParser().parseFromString(html, 'text/html');
-
-    const og = doc.querySelector('meta[property="og:image"]');
-    if (og && og.content && !og.content.includes('placeholder')) {
-      return (dynamicCache[key] = og.content);
+  for (const proxyUrl of proxyUrls) {
+    try {
+      const resp = await fetchWithTimeout(proxyUrl, 12000);
+      if (!resp.ok) continue;
+      const html = await resp.text();
+      const parsed = extractImageUrlFromHtml(html, comic.source);
+      if (parsed) return (dynamicCache[key] = parsed);
+    } catch {
+      // Try the next proxy candidate.
     }
-
-    // GoComics fallback: preload link with imagesrcset
-    if (comic.source === 'gocomics') {
-      const link = doc.querySelector('link[rel="preload"][as="image"]');
-      if (link) {
-        const src = link.getAttribute('imagesrcset') || link.getAttribute('href') || '';
-        const url = src.split(',')[0].trim().split(' ')[0].split('?')[0];
-        if (url) return (dynamicCache[key] = url);
-      }
-    }
-  } catch { /* network error or timeout */ }
+  }
 
   return (dynamicCache[key] = null);
 }
@@ -187,8 +228,7 @@ function prefetch(fromDate, count) {
 function updateNavButtons() {
   const startDate  = config ? config.start_date : '2000-01-01';
   const prevDate   = addDays(currentDate, -1);
-  const nextDate   = addDays(currentDate, 1);
-  const atStart    = currentDate <= startDate;
+  const atStart    = prevDate < startDate;
   const atEnd      = latestDate && currentDate >= latestDate;
 
   btnPrev.disabled    = atStart;
@@ -212,18 +252,20 @@ btnNext.addEventListener('click', () => {
 
 // ── Swipe gestures ────────────────────────────────────────────────────────────
 
-let touchStartX = 0;
+if (SWIPE_NAV_ENABLED) {
+  let touchStartX = 0;
 
-document.addEventListener('touchstart', e => {
-  touchStartX = e.touches[0].clientX;
-}, { passive: true });
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
 
-document.addEventListener('touchend', e => {
-  const dx = e.changedTouches[0].clientX - touchStartX;
-  if (Math.abs(dx) < 50) return;    // ignore short swipes
-  if (dx > 0 && !btnPrev.disabled) btnPrev.click();
-  if (dx < 0) btnNext.click();
-});
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) < 50) return; // ignore short swipes
+    if (dx > 0 && !btnPrev.disabled) btnPrev.click();
+    if (dx < 0) btnNext.click();
+  });
+}
 
 // ── Keyboard ──────────────────────────────────────────────────────────────────
 

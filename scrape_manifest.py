@@ -21,6 +21,9 @@ from bs4 import BeautifulSoup
 # Hard wall-clock timeout for any single HTTP request (SSL hangs bypass normal timeouts)
 _REQUEST_TIMEOUT = 25
 
+# Number of daily manifest files to keep before cleanup removes older files.
+MANIFEST_KEEP_DAYS = 90
+
 socket.setdefaulttimeout(20)
 
 HEADERS = {
@@ -117,7 +120,7 @@ def scrape_date(config, date):
         with open(latest_path, 'w', encoding='utf-8') as f:
             json.dump(latest, f)
 
-def cleanup_old_manifests(keep_days=30):
+def cleanup_old_manifests(keep_days=MANIFEST_KEEP_DAYS):
     cutoff = datetime.date.today() - datetime.timedelta(days=keep_days)
     for f in sorted(Path('manifest').glob('????-??-??.json')):
         try:
@@ -154,7 +157,7 @@ def main():
     else:
         scrape_date(config, datetime.date.today())
 
-    cleanup_old_manifests(keep_days=30)
+    cleanup_old_manifests(keep_days=MANIFEST_KEEP_DAYS)
 
 if __name__ == '__main__':
     main()

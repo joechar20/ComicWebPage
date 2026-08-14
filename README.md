@@ -76,6 +76,22 @@ Controls how many days ahead the reader silently loads in the background for smo
 
 Higher values improve scroll smoothness but increase background data usage. Recommended range: 2–5.
 
+#### Manifest Retention (`MANIFEST_KEEP_DAYS`)
+
+**File:** `scrape_manifest.py` — edit the `MANIFEST_KEEP_DAYS` variable near the top of the file.
+
+Controls how many daily files in the `manifest/` folder are retained before cleanup deletes older date-stamped files.
+
+```python
+MANIFEST_KEEP_DAYS = 90
+```
+
+How it works:
+- After each scrape run, cleanup removes files older than today minus `MANIFEST_KEEP_DAYS`.
+- `manifest/latest.json` is not date-stamped and is not affected by this cleanup.
+
+If you want to keep more history, increase the value. Example: `MANIFEST_KEEP_DAYS = 180`.
+
 #### Adding a Comic
 
 **File:** `comics.json` — add an entry inside the `"comics": [ ]` array, which starts after the top-level settings keys.
