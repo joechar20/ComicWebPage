@@ -174,6 +174,79 @@ function extractImageUrlFromHtml(html, source) {
   return null;
 }
 
+function extractImageUrlFromRssItem(item) {
+  const mediaContent = item.querySelector('media\\:content, content');
+  if (mediaContent) {
+    const mediaUrl = mediaContent.getAttribute('url');
+    if (mediaUrl) return mediaUrl;
+  }
+
+  const description = item.querySelector('description');
+  if (description && description.textContent) {
+    const descDoc = new DOMParser().parseFromString(description.textContent, 'text/html');
+    const img = descDoc.querySelector('img');
+    if (img && img.src) return img.src;
+  }
+
+  const encoded = item.querySelector('content\\:encoded');
+  if (encoded && encoded.textContent) {
+    const encodedDoc = new DOMParser().parseFromString(encoded.textContent, 'text/html');
+    const img = encodedDoc.querySelector('img');
+    if (img && img.src) return img.src;
+  }
+
+  return null;
+}
+
+function toIsoDateUTC(dateObj) {
+  const yy = dateObj.getUTCFullYear();
+  const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function toIsoDateLocal(dateObj) {
+  const yy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function getGoComicsSlug(comic) {
+  const path = new URL(comic.url).pathname.split('/').filter(Boolean);
+  return path[path.length - 1] || comic.id;
+}
+
+async function fetchImageFromGoComicsRss(comic, dateStr) {
+  const slug = getGoComicsSlug(comic);
+  const feedUrl = `https://feeds.feedburner.com/uclick/${slug}`;
+
+  try {
+    const resp = await fetchWithTimeout(feedUrl, 12000);
+    if (!resp.ok) return null;
+    const xmlText = await resp.text();
+    const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+
+    for (const item of items) {
+      const pubDate = item.querySelector('pubDate')?.textContent;
+      if (!pubDate) continue;
+      const dt = new Date(pubDate);
+      if (Number.isNaN(dt.getTime())) continue;
+
+      const isMatch = toIsoDateUTC(dt) === dateStr || toIsoDateLocal(dt) === dateStr;
+      if (!isMatch) continue;
+
+      const imageUrl = extractImageUrlFromRssItem(item);
+      if (imageUrl) return imageUrl;
+    }
+  } catch {
+    // RSS fallback is best-effort only.
+  }
+
+  return null;
+}
+
 async function fetchImageUrlDynamic(id, dateStr) {
   const key = `${id}:${dateStr}`;
   if (dynamicCache[key] !== undefined) return dynamicCache[key];
@@ -201,6 +274,11 @@ async function fetchImageUrlDynamic(id, dateStr) {
     } catch {
       // Try the next proxy candidate.
     }
+  }
+
+  if (comic.source === 'gocomics') {
+    const rssUrl = await fetchImageFromGoComicsRss(comic, dateStr);
+    if (rssUrl) return (dynamicCache[key] = rssUrl);
   }
 
   return (dynamicCache[key] = null);
@@ -231,10 +309,11 @@ function updateNavButtons() {
   const atStart    = prevDate < startDate;
   const atEnd      = latestDate && currentDate >= latestDate;
 
-  btnPrev.disabled    = atStart;
+  btnPrev.disabled    = false;
   btnNext.disabled    = false;
   btnNext.textContent = atEnd ? 'Done ✓' : 'Next →';
   btnNext.classList.toggle('done-btn', !!atEnd);
+  btnPrev.classList.toggle('at-start', !!atStart);
 }
 
 btnPrev.addEventListener('click', () => {

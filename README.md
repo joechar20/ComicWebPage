@@ -92,6 +92,12 @@ How it works:
 
 If you want to keep more history, increase the value. Example: `MANIFEST_KEEP_DAYS = 180`.
 
+### GoComics Scrape Fallback (Manifest Reliability)
+
+When GoComics page scraping is blocked by anti-bot checks, the scraper now attempts proxy-based parsing and then falls back to the most recent manifest URL for that comic (up to 7 days back).
+
+This keeps daily manifest entries from becoming `null` during temporary upstream blocking.
+
 #### Adding a Comic
 
 **File:** `comics.json` — add an entry inside the `"comics": [ ]` array, which starts after the top-level settings keys.

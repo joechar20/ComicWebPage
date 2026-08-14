@@ -14,6 +14,7 @@ import json
 import sys
 import socket
 import datetime
+from urllib.parse import quote_plus
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from bs4 import BeautifulSoup
@@ -53,21 +54,8 @@ def build_page_url(comic, date):
     else:  # comicskingdom
         return f"{base}/{date.strftime('%Y-%m-%d')}"
 
-def extract_image_url(page_url, source):
-    """Return the comic image URL from the page, or None on failure."""
-    try:
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            future = ex.submit(_do_fetch, page_url, source)
-            resp = future.result(timeout=_REQUEST_TIMEOUT)
-        resp.raise_for_status()
-    except FuturesTimeout:
-        print(f"    TIMEOUT: {page_url}")
-        return None
-    except Exception as e:
-        print(f"    FETCH ERROR: {e}")
-        return None
-
-    soup = BeautifulSoup(resp.text, 'html.parser')
+def _extract_image_from_html(html, source):
+    soup = BeautifulSoup(html, 'html.parser')
 
     # og:image works for both GoComics and Comics Kingdom
     meta = soup.find('meta', property='og:image')
@@ -82,11 +70,62 @@ def extract_image_url(page_url, source):
         if link:
             srcset = link.get('imagesrcset') or link.get('href', '')
             if srcset:
-                # imagesrcset may be "url 1x, url 2x" — take the first
                 first = srcset.split(',')[0].strip().split(' ')[0]
-                return first.partition('?')[0]  # strip query string
+                return first.partition('?')[0]
+
+    return None
+
+def extract_image_url(page_url, source):
+    """Return the comic image URL from the page, or None on failure."""
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_do_fetch, page_url, source)
+            resp = future.result(timeout=_REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        parsed = _extract_image_from_html(resp.text, source)
+        if parsed:
+            return parsed
+    except FuturesTimeout:
+        print(f"    TIMEOUT: {page_url}")
+    except Exception as e:
+        print(f"    FETCH ERROR: {e}")
+
+    # Best-effort proxies for GoComics challenge pages.
+    if source == 'gocomics':
+        proxy_urls = [
+            f"https://api.allorigins.win/raw?url={quote_plus(page_url)}",
+            f"https://r.jina.ai/http://{page_url.replace('https://', '').replace('http://', '')}"
+        ]
+
+        for proxy_url in proxy_urls:
+            try:
+                proxy_resp = requests.get(proxy_url, headers=HEADERS, timeout=(8, 15))
+                if not proxy_resp.ok:
+                    continue
+                parsed = _extract_image_from_html(proxy_resp.text, source)
+                if parsed:
+                    return parsed
+            except Exception:
+                pass
 
     print(f"    WARN: no image URL found at {page_url}")
+    return None
+
+def fallback_previous_manifest_url(comic_id, date, lookback_days=7):
+    """Use the most recent known URL for this comic when today's scrape is blocked."""
+    for i in range(1, lookback_days + 1):
+        prev_date = (date - datetime.timedelta(days=i)).strftime('%Y-%m-%d')
+        path = Path('manifest') / f"{prev_date}.json"
+        if not path.exists():
+            continue
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            url = data.get(comic_id)
+            if url:
+                return url
+        except (json.JSONDecodeError, OSError):
+            continue
     return None
 
 def scrape_date(config, date):
@@ -98,6 +137,10 @@ def scrape_date(config, date):
         page_url = build_page_url(comic, date)
         print(f"  {comic['id']}")
         image_url = extract_image_url(page_url, comic['source'])
+        if not image_url and comic['source'] == 'gocomics':
+            image_url = fallback_previous_manifest_url(comic['id'], date)
+            if image_url:
+                print(f"    Fallback: reused previous manifest URL for {comic['id']}")
         manifest[comic['id']] = image_url
         print(f"    -> {image_url}")
 
