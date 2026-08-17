@@ -49,11 +49,60 @@ def _log(verbose, message):
 
 
 def _do_fetch(page_url, source):
-    """Blocking fetch — called inside a thread so the caller can enforce a hard timeout."""
+    """Blocking fetch — called inside a thread so the caller can enforce a hard timeout.
+
+    source='requests' forces plain requests regardless of comic source, used
+    for the GoComics no-date URL which doesn't need cloudscraper.
+    """
     if source == 'gocomics':
         scraper = cloudscraper.create_scraper()
         return scraper.get(page_url, headers=HEADERS, timeout=(8, 15))
     return requests.get(page_url, headers=HEADERS, timeout=(8, 15))
+
+
+def _fetch_gocomics_with_session(no_date_url, dated_url, verbose=False):
+    """Two-step GoComics fetch that works on GitHub-hosted runners.
+
+    Step 1: Use cloudscraper on the no-date URL to solve BunnyShield PoW
+            and obtain the session cookies (bunny_shield_id + INGRESSCOOKIE).
+    Step 2: Reuse those cookies via a requests.Session on the dated URL.
+            The cookies make GoComics return the full page regardless of IP.
+    """
+    try:
+        scraper = cloudscraper.create_scraper()
+        _log(verbose, f"    [session] Solving BunnyShield challenge via {no_date_url}")
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(scraper.get, no_date_url, timeout=(8, 20))
+            warm_resp = future.result(timeout=_REQUEST_TIMEOUT + 5)
+        _log(verbose, f"    [session] Step 1 HTTP {warm_resp.status_code} — cookies: {list(dict(warm_resp.cookies).keys())}")
+        if warm_resp.status_code != 200 or _is_challenge_page(warm_resp.text):
+            _log(verbose, "    [session] Step 1 blocked; falling back to standard fetch.")
+            return None, None
+
+        # Build a requests.Session carrying the solved cookies
+        session_ua = warm_resp.request.headers.get('User-Agent', HEADERS['User-Agent'])
+        sess = requests.Session()
+        sess.headers.update({
+            'User-Agent': session_ua,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://www.gocomics.com/',
+        })
+        sess.cookies.update(dict(warm_resp.cookies))
+
+        _log(verbose, f"    [session] Step 2 fetching dated URL {dated_url}")
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(sess.get, dated_url, timeout=(8, 15))
+            dated_resp = future.result(timeout=_REQUEST_TIMEOUT)
+        _log(verbose, f"    [session] Step 2 HTTP {dated_resp.status_code} body={len(dated_resp.text)}")
+        return warm_resp, dated_resp
+
+    except FuturesTimeout:
+        _log(verbose, "    [session] Timeout during session fetch.")
+        return None, None
+    except Exception as e:
+        _log(verbose, f"    [session] Session fetch error: {e}")
+        return None, None
 
 def load_config(config_path):
     with open(config_path, 'r', encoding='utf-8') as f:
@@ -66,15 +115,33 @@ def build_page_url(comic, date):
     else:  # comicskingdom
         return f"{base}/{date.strftime('%Y-%m-%d')}"
 
+def build_no_date_url(comic):
+    """Return the dateless GoComics URL (always redirects to today's strip)."""
+    return comic['url'].rstrip('/')
+
 def _extract_image_from_html(html, source):
     soup = BeautifulSoup(html, 'html.parser')
 
-    # og:image works for both GoComics and Comics Kingdom
+    # og:image works for both GoComics and Comics Kingdom.
+    # For GoComics no-date pages, og:image is a static social preview, NOT the strip —
+    # so we skip it when it points to gocomicscmsassets (the CMS/static asset host).
     meta = soup.find('meta', property='og:image')
     if meta and meta.get('content'):
         url = meta['content'].strip()
-        if url and not url.endswith('default') and 'placeholder' not in url.lower():
+        if (url
+                and not url.endswith('default')
+                and 'placeholder' not in url.lower()
+                and 'gocomicscmsassets' not in url):
             return url
+
+    # GoComics: first featureassets <img> src is the actual strip image.
+    # This works on both dated and no-date pages.
+    if source == 'gocomics':
+        for img in soup.find_all('img'):
+            src = img.get('src', '')
+            m = _FEATURE_ASSET_RE.match(src)
+            if m:
+                return m.group(0).partition('?')[0]
 
     # GoComics fallback: preload link with imagesrcset
     if source == 'gocomics':
@@ -93,35 +160,61 @@ def _extract_image_from_html(html, source):
     return None
 
 def _is_challenge_page(html):
+    """Return True only if the page is a bot-challenge interstitial, not real content."""
     lowered = html.lower()
-    return any(
-        marker in lowered
-        for marker in (
-            'cf-challenge',
-            'just a moment',
-            'captcha',
-            'attention required',
-            '/cdn-cgi/challenge-platform/',
-        )
+    # Must match a structural challenge marker, not just the word appearing in content
+    challenge_markers = (
+        'cf-challenge',
+        'just a moment</title>',
+        'attention required</title>',
+        '/cdn-cgi/challenge-platform/',
+        'bunny-shield/assets/shield-challenge',
+        'bunny_shield_id',
+        'establishing a secure connection</title>',
     )
+    return any(marker in lowered for marker in challenge_markers)
 
 
-def extract_image_url(page_url, source, verbose=False):
-    """Return the comic image URL from the page, or None on failure."""
+def extract_image_url(page_url, source, verbose=False, no_date_url=None):
+    """Return the comic image URL from the page, or None on failure.
+
+    For GoComics today: use the two-step session approach —
+      1. cloudscraper on the no-date URL to solve BunnyShield and get cookies.
+      2. Plain requests with those cookies on the dated URL.
+    This bypasses the datacenter-IP 403 that GitHub-hosted runners hit.
+
+    For GoComics backfill or if no_date_url is not provided: standard cloudscraper fetch.
+    """
+    # --- GoComics today: two-step session strategy ---
+    if source == 'gocomics' and no_date_url:
+        warm_resp, dated_resp = _fetch_gocomics_with_session(no_date_url, page_url, verbose=verbose)
+        if dated_resp is not None and dated_resp.status_code == 200:
+            parsed = _extract_image_from_html(dated_resp.text, source)
+            if parsed:
+                return parsed
+            _log(verbose, "    [session] Dated page parse found no image; trying no-date page.")
+            # Fall back to extracting from the already-fetched no-date page
+            if warm_resp is not None:
+                parsed = _extract_image_from_html(warm_resp.text, source)
+                if parsed:
+                    return parsed
+        _log(verbose, "    [session] Two-step session failed; trying standard fetch.")
+
+    # --- Standard fetch (backfill, or session approach failed) ---
     try:
         with ThreadPoolExecutor(max_workers=1) as ex:
             future = ex.submit(_do_fetch, page_url, source)
             resp = future.result(timeout=_REQUEST_TIMEOUT)
-        _log(verbose, f"    HTTP {resp.status_code} from {resp.url}")
-        _log(verbose, f"    Content-Type: {resp.headers.get('Content-Type', '<missing>')}")
-        _log(verbose, f"    Body bytes: {len(resp.text)}")
+        _log(verbose, f"    [direct] HTTP {resp.status_code} from {resp.url}")
+        _log(verbose, f"    [direct] Content-Type: {resp.headers.get('Content-Type', '<missing>')}")
+        _log(verbose, f"    [direct] Body bytes: {len(resp.text)}")
         resp.raise_for_status()
         if source == 'gocomics' and _is_challenge_page(resp.text):
-            _log(verbose, "    Detected challenge page; moving to proxy fallbacks.")
+            _log(verbose, "    [direct] Detected challenge page; moving to proxy fallbacks.")
         parsed = _extract_image_from_html(resp.text, source)
         if parsed:
             return parsed
-        _log(verbose, "    Direct scrape parse failed; trying proxy fallbacks.")
+        _log(verbose, "    [direct] Parse found no image; trying proxy fallbacks.")
     except FuturesTimeout:
         print(f"    TIMEOUT: {page_url}")
     except Exception as e:
@@ -172,13 +265,18 @@ def fallback_previous_manifest_url(comic_id, date, manifest_dirs, lookback_days=
 
 def scrape_date(config, date, manifest_dir='manifest', fallback_manifest_dir=None, verbose=False):
     date_str = date.strftime('%Y-%m-%d')
-    print(f"\nScraping {date_str}")
+    is_today = (date == datetime.date.today())
+    print(f"\nScraping {date_str}" + (" [today — no-date URL strategy active]" if is_today else ""))
     manifest = {}
 
     for comic in config['comics']:
         page_url = build_page_url(comic, date)
+        # For today's GoComics scrape, pass the no-date URL so the scraper
+        # tries it first with plain requests — avoids the datacenter-IP 403
+        # that the dated URL triggers on GitHub-hosted runners.
+        no_date_url = build_no_date_url(comic) if (is_today and comic['source'] == 'gocomics') else None
         print(f"  {comic['id']}")
-        image_url = extract_image_url(page_url, comic['source'], verbose=verbose)
+        image_url = extract_image_url(page_url, comic['source'], verbose=verbose, no_date_url=no_date_url)
         if not image_url and comic['source'] == 'gocomics':
             fallback_dirs = [manifest_dir]
             if fallback_manifest_dir and fallback_manifest_dir not in fallback_dirs:
