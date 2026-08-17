@@ -41,7 +41,7 @@ Static comic reader hosted on GitHub Pages. Images are pulled in real time from 
   - `scrape-debug.log`
   - `manifest-test/YYYY-MM-DD.json`
 
-This test workflow is designed to isolate GoComics behavior in GitHub-hosted runners without touching production `manifest/`.
+This test workflow is designed to isolate GoComics behavior in GitHub-hosted runners without touching production `manifest/`. It writes to `manifest-test/` but can reuse historical links from `manifest/` when GoComics blocks direct scraping on CI.
 
 ### Configuration — comics.json
 
@@ -114,6 +114,7 @@ This keeps daily manifest entries from becoming `null` during temporary upstream
 - `--verbose` for detailed HTTP/proxy diagnostics
 - `--config <path>` to run against alternate comic lists (such as the 4-comic test set)
 - `--manifest-dir <dir>` to write outputs outside `manifest/`
+- `--fallback-manifest-dir <dir>` to reuse historical links from another manifest folder
 
 #### Adding a Comic
 

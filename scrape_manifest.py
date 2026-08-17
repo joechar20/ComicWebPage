@@ -152,24 +152,25 @@ def extract_image_url(page_url, source, verbose=False):
     print(f"    WARN: no image URL found at {page_url}")
     return None
 
-def fallback_previous_manifest_url(comic_id, date, manifest_dir, lookback_days=7):
+def fallback_previous_manifest_url(comic_id, date, manifest_dirs, lookback_days=7):
     """Use the most recent known URL for this comic when today's scrape is blocked."""
-    for i in range(1, lookback_days + 1):
-        prev_date = (date - datetime.timedelta(days=i)).strftime('%Y-%m-%d')
-        path = Path(manifest_dir) / f"{prev_date}.json"
-        if not path.exists():
-            continue
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            url = data.get(comic_id)
-            if url:
-                return url
-        except (json.JSONDecodeError, OSError):
-            continue
+    for manifest_dir in manifest_dirs:
+        for i in range(1, lookback_days + 1):
+            prev_date = (date - datetime.timedelta(days=i)).strftime('%Y-%m-%d')
+            path = Path(manifest_dir) / f"{prev_date}.json"
+            if not path.exists():
+                continue
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                url = data.get(comic_id)
+                if url:
+                    return url
+            except (json.JSONDecodeError, OSError):
+                continue
     return None
 
-def scrape_date(config, date, manifest_dir='manifest', verbose=False):
+def scrape_date(config, date, manifest_dir='manifest', fallback_manifest_dir=None, verbose=False):
     date_str = date.strftime('%Y-%m-%d')
     print(f"\nScraping {date_str}")
     manifest = {}
@@ -179,7 +180,10 @@ def scrape_date(config, date, manifest_dir='manifest', verbose=False):
         print(f"  {comic['id']}")
         image_url = extract_image_url(page_url, comic['source'], verbose=verbose)
         if not image_url and comic['source'] == 'gocomics':
-            image_url = fallback_previous_manifest_url(comic['id'], date, manifest_dir=manifest_dir)
+            fallback_dirs = [manifest_dir]
+            if fallback_manifest_dir and fallback_manifest_dir not in fallback_dirs:
+                fallback_dirs.append(fallback_manifest_dir)
+            image_url = fallback_previous_manifest_url(comic['id'], date, manifest_dirs=fallback_dirs)
             if image_url:
                 print(f"    Fallback: reused previous manifest URL for {comic['id']}")
         manifest[comic['id']] = image_url
@@ -227,6 +231,11 @@ def main():
     parser.add_argument('--backfill', nargs=2, metavar=('START', 'END'))
     parser.add_argument('--config', default='comics.json', help='Path to comics config JSON.')
     parser.add_argument('--manifest-dir', default='manifest', help='Output manifest directory.')
+    parser.add_argument(
+        '--fallback-manifest-dir',
+        default=None,
+        help='Optional secondary manifest directory to use for historical URL fallback.',
+    )
     parser.add_argument('--verbose', action='store_true', help='Enable verbose scrape diagnostics.')
     parser.add_argument('legacy_date', nargs='*', help='Legacy positional date args: YYYY MM DD')
     args = parser.parse_args()
@@ -235,13 +244,31 @@ def main():
 
     if args.backfill:
         for date in daterange(args.backfill[0], args.backfill[1]):
-            scrape_date(config, date, manifest_dir=args.manifest_dir, verbose=args.verbose)
+            scrape_date(
+                config,
+                date,
+                manifest_dir=args.manifest_dir,
+                fallback_manifest_dir=args.fallback_manifest_dir,
+                verbose=args.verbose,
+            )
     elif len(args.legacy_date) == 3:
         # Legacy Y M D positional args kept for GitHub Actions compatibility
         date = datetime.date(int(args.legacy_date[0]), int(args.legacy_date[1]), int(args.legacy_date[2]))
-        scrape_date(config, date, manifest_dir=args.manifest_dir, verbose=args.verbose)
+        scrape_date(
+            config,
+            date,
+            manifest_dir=args.manifest_dir,
+            fallback_manifest_dir=args.fallback_manifest_dir,
+            verbose=args.verbose,
+        )
     elif len(args.legacy_date) == 0:
-        scrape_date(config, datetime.date.today(), manifest_dir=args.manifest_dir, verbose=args.verbose)
+        scrape_date(
+            config,
+            datetime.date.today(),
+            manifest_dir=args.manifest_dir,
+            fallback_manifest_dir=args.fallback_manifest_dir,
+            verbose=args.verbose,
+        )
     else:
         print("Usage: scrape_manifest.py [--backfill YYYY-MM-DD YYYY-MM-DD] [--config PATH] [--manifest-dir DIR] [--verbose] [YYYY MM DD]")
         sys.exit(1)

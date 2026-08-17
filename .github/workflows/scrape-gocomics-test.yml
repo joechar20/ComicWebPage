@@ -36,12 +36,14 @@ jobs:
             python scrape_manifest.py \
               --config configs/comics.gocomics-test.json \
               --manifest-dir manifest-test \
+              --fallback-manifest-dir manifest \
               --verbose \
               "$y" "$m" "$d" 2>&1 | tee scrape-debug.log
           else
             python scrape_manifest.py \
               --config configs/comics.gocomics-test.json \
               --manifest-dir manifest-test \
+              --fallback-manifest-dir manifest \
               --verbose 2>&1 | tee scrape-debug.log
           fi
 
