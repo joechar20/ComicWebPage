@@ -1,0 +1,55 @@
+name: GoComics Scrape Test (4 Comics)
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Specific date to scrape (YYYY-MM-DD). Leave blank for today.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  scrape-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests beautifulsoup4 cloudscraper
+          python -c "import requests, bs4, cloudscraper; print('requests', requests.__version__); print('beautifulsoup4', bs4.__version__); print('cloudscraper', cloudscraper.__version__)"
+
+      - name: Run 4-comic GoComics scrape test
+        run: |
+          set -o pipefail
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            IFS='-' read -r y m d <<< "${{ github.event.inputs.date }}"
+            python scrape_manifest.py \
+              --config configs/comics.gocomics-test.json \
+              --manifest-dir manifest-test \
+              --verbose \
+              "$y" "$m" "$d" 2>&1 | tee scrape-debug.log
+          else
+            python scrape_manifest.py \
+              --config configs/comics.gocomics-test.json \
+              --manifest-dir manifest-test \
+              --verbose 2>&1 | tee scrape-debug.log
+          fi
+
+      - name: Upload test manifests and debug logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gocomics-test-artifacts
+          path: |
+            scrape-debug.log
+            manifest-test/

@@ -34,20 +34,32 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 cloudscraper
+        run: |
+          pip install --upgrade pip
+          pip install requests beautifulsoup4 cloudscraper
+          python -c "import requests, bs4, cloudscraper; print('requests', requests.__version__); print('beautifulsoup4', bs4.__version__); print('cloudscraper', cloudscraper.__version__)"
 
       - name: Run scraper
         run: |
+          set -o pipefail
           if [ -n "${{ github.event.inputs.backfill_start }}" ]; then
             python scrape_manifest.py --backfill \
               "${{ github.event.inputs.backfill_start }}" \
-              "${{ github.event.inputs.backfill_end }}"
+              "${{ github.event.inputs.backfill_end }}" \
+              --verbose 2>&1 | tee scrape-debug.log
           elif [ -n "${{ github.event.inputs.date }}" ]; then
             IFS='-' read -r y m d <<< "${{ github.event.inputs.date }}"
-            python scrape_manifest.py "$y" "$m" "$d"
+            python scrape_manifest.py --verbose "$y" "$m" "$d" 2>&1 | tee scrape-debug.log
           else
-            python scrape_manifest.py
+            python scrape_manifest.py --verbose 2>&1 | tee scrape-debug.log
           fi
+
+      - name: Upload scrape debug log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-debug-log
+          path: scrape-debug.log
 
       - name: Commit manifest
         run: |
