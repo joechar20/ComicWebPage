@@ -36,7 +36,7 @@ jobs:
             --fallback-manifest-dir manifest \
             --verbose | tee scrape-debug.log
 
-        - name: Validate generated test manifest
+      - name: Validate generated test manifest
         run: |
           python - <<'PY'
           import glob
