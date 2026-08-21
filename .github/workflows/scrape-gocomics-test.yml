@@ -47,9 +47,9 @@ jobs:
             config = json.load(f)
           expected_ids = [c["id"] for c in config.get("comics", [])]
 
-          files = sorted(glob.glob("manifest-test/*.json"))
+            files = sorted(glob.glob("manifest-test/????-??-??.json"))
           if not files:
-            print("No manifest-test JSON file was generated.")
+              print("No date-stamped manifest-test JSON file was generated.")
             sys.exit(1)
 
           latest = files[-1]
