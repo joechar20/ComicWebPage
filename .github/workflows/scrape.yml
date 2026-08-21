@@ -41,13 +41,82 @@ jobs:
           if [ -n "${{ github.event.inputs.backfill_start }}" ]; then
             python scrape_manifest.py --backfill \
               "${{ github.event.inputs.backfill_start }}" \
-              "${{ github.event.inputs.backfill_end }}"
+              "${{ github.event.inputs.backfill_end }}" \
+              --verbose | tee scrape-debug.log
           elif [ -n "${{ github.event.inputs.date }}" ]; then
             IFS='-' read -r y m d <<< "${{ github.event.inputs.date }}"
-            python scrape_manifest.py "$y" "$m" "$d"
+            python scrape_manifest.py "$y" "$m" "$d" --verbose | tee scrape-debug.log
           else
-            python scrape_manifest.py
+            python scrape_manifest.py --verbose | tee scrape-debug.log
           fi
+
+      - name: Validate backfill quality gate
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.backfill_start != '' && github.event.inputs.backfill_end != '' }}
+        env:
+          BACKFILL_START: ${{ github.event.inputs.backfill_start }}
+          BACKFILL_END: ${{ github.event.inputs.backfill_end }}
+          FALLBACK_IMAGE_URL: https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmpiYTNwdnhseThwZG1uOTh5MTU5M3JsbGFpY3JqYXZjc2h4YTZtdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uq6ILNBI6g3As/giphy.gif
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          import sys
+
+          start = dt.date.fromisoformat(os.environ['BACKFILL_START'])
+          end = dt.date.fromisoformat(os.environ['BACKFILL_END'])
+          fallback_url = os.environ['FALLBACK_IMAGE_URL']
+
+          violations = []
+          day = start
+          while day <= end:
+              path = f"manifest/{day.isoformat()}.json"
+              try:
+                  with open(path, 'r', encoding='utf-8') as f:
+                      data = json.load(f)
+              except FileNotFoundError:
+                  violations.append(f"{day.isoformat()}: missing manifest file")
+                  day += dt.timedelta(days=1)
+                  continue
+
+              total = len(data)
+              non_fallback = 0
+              fallback_count = 0
+              for value in data.values():
+                  if value == fallback_url:
+                      fallback_count += 1
+                  elif isinstance(value, str) and value.strip():
+                      non_fallback += 1
+
+              success_ratio = (non_fallback / total) if total else 0.0
+              print(
+                  f"{day.isoformat()}: total={total} non_fallback={non_fallback} "
+                  f"fallback={fallback_count} success_ratio={success_ratio:.1%}"
+              )
+
+              if success_ratio < 0.5:
+                  violations.append(f"{day.isoformat()}: success ratio below 50% ({success_ratio:.1%})")
+              if fallback_count > 0:
+                  violations.append(f"{day.isoformat()}: fallback image used {fallback_count} time(s)")
+
+              day += dt.timedelta(days=1)
+
+          if violations:
+              print("\nBackfill quality gate failed:")
+              for v in violations:
+                  print(f"- {v}")
+              sys.exit(1)
+
+          print("\nBackfill quality gate passed.")
+          PY
+
+      - name: Upload scrape debug log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-scrape-debug-log
+          path: scrape-debug.log
+          retention-days: 15
 
       - name: Commit manifest
         run: |
