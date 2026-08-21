@@ -1,6 +1,9 @@
 name: GoComics CI Test (4 comics)
 
 on:
+  push:
+    branches:
+      - fix-gocomics-actions-testonly
   workflow_dispatch:
 
 permissions:
@@ -32,6 +35,41 @@ jobs:
             --manifest-dir manifest-test \
             --fallback-manifest-dir manifest \
             --verbose | tee scrape-debug.log
+
+        - name: Validate generated test manifest
+        run: |
+          python - <<'PY'
+          import glob
+          import json
+          import sys
+
+          with open("configs/comics.gocomics-test.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+          expected_ids = [c["id"] for c in config.get("comics", [])]
+
+          files = sorted(glob.glob("manifest-test/*.json"))
+          if not files:
+            print("No manifest-test JSON file was generated.")
+            sys.exit(1)
+
+          latest = files[-1]
+          with open(latest, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+
+          missing = []
+          for comic_id in expected_ids:
+            value = manifest.get(comic_id)
+            if not isinstance(value, str) or not value.strip():
+              missing.append(comic_id)
+
+          if missing:
+            print(f"Manifest validation failed for IDs: {', '.join(missing)}")
+            print(f"Manifest file checked: {latest}")
+            sys.exit(1)
+
+          print(f"Manifest validation passed: {latest}")
+          print(f"Validated {len(expected_ids)} comics with non-empty URLs.")
+          PY
 
       - name: Upload diagnostics
         if: always()
