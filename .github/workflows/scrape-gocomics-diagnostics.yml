@@ -1,6 +1,9 @@
 name: GoComics Diagnostics (Isolated)
 
 on:
+  push:
+    branches:
+      - fix-gocomics-actions-testonly
   workflow_dispatch:
     inputs:
       mode:
