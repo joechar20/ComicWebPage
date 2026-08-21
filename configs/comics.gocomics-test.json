@@ -1,0 +1,11 @@
+{
+  "start_date": "2026-08-10",
+  "prefetch_days": 1,
+  "default_sort": ["title", "date"],
+  "comics": [
+    { "id": "babyblues", "title": "Baby Blues", "url": "https://www.gocomics.com/babyblues/", "source": "gocomics", "orientation": "landscape" },
+    { "id": "bc", "title": "B.C.", "url": "https://www.gocomics.com/bc/", "source": "gocomics", "orientation": "landscape" },
+    { "id": "calvinandhobbes", "title": "Calvin and Hobbes", "url": "https://www.gocomics.com/calvinandhobbes/", "source": "gocomics", "orientation": "landscape" },
+    { "id": "garfield", "title": "Garfield", "url": "https://www.gocomics.com/garfield/", "source": "gocomics", "orientation": "landscape" }
+  ]
+}

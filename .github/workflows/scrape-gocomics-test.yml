@@ -1,0 +1,43 @@
+name: GoComics CI Test (4 comics)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gocomics-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run GoComics test scrape
+        run: |
+          mkdir -p manifest-test
+          python scrape_manifest.py \
+            --config configs/comics.gocomics-test.json \
+            --manifest-dir manifest-test \
+            --fallback-manifest-dir manifest \
+            --verbose | tee scrape-debug.log
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gocomics-test-diagnostics
+          path: |
+            scrape-debug.log
+            manifest-test/*.json
