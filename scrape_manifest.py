@@ -42,6 +42,10 @@ _FEATURE_ASSET_RE = re.compile(
     r"https?://(?:featureassets|assets)\.gocomics\.com/assets/[a-zA-Z0-9]+(?:\?[^\s\"'<>)]+)?"
 )
 
+FALLBACK_IMAGE_URL = (
+    "https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmpiYTNwdnhseThwZG1uOTh5MTU5M3JsbGFpY3JqYXZjc2h4YTZtdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uq6ILNBI6g3As/giphy.gif"
+)
+
 
 def _log(verbose, message):
     if verbose:
@@ -245,24 +249,6 @@ def extract_image_url(page_url, source, verbose=False, no_date_url=None):
     print(f"    WARN: no image URL found at {page_url}")
     return None
 
-def fallback_previous_manifest_url(comic_id, date, manifest_dirs, lookback_days=30):
-    """Use the most recent known URL for this comic when today's scrape is blocked."""
-    for manifest_dir in manifest_dirs:
-        for i in range(1, lookback_days + 1):
-            prev_date = (date - datetime.timedelta(days=i)).strftime('%Y-%m-%d')
-            path = Path(manifest_dir) / f"{prev_date}.json"
-            if not path.exists():
-                continue
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                url = data.get(comic_id)
-                if url:
-                    return url
-            except (json.JSONDecodeError, OSError):
-                continue
-    return None
-
 def scrape_date(config, date, manifest_dir='manifest', fallback_manifest_dir=None, verbose=False):
     date_str = date.strftime('%Y-%m-%d')
     is_today = (date == datetime.date.today())
@@ -277,13 +263,9 @@ def scrape_date(config, date, manifest_dir='manifest', fallback_manifest_dir=Non
         no_date_url = build_no_date_url(comic) if (is_today and comic['source'] == 'gocomics') else None
         print(f"  {comic['id']}")
         image_url = extract_image_url(page_url, comic['source'], verbose=verbose, no_date_url=no_date_url)
-        if not image_url and comic['source'] == 'gocomics':
-            fallback_dirs = [manifest_dir]
-            if fallback_manifest_dir and fallback_manifest_dir not in fallback_dirs:
-                fallback_dirs.append(fallback_manifest_dir)
-            image_url = fallback_previous_manifest_url(comic['id'], date, manifest_dirs=fallback_dirs)
-            if image_url:
-                print(f"    Fallback: reused previous manifest URL for {comic['id']}")
+        if not image_url:
+            image_url = FALLBACK_IMAGE_URL
+            print(f"    Fallback: using static fallback image for {comic['id']}")
         manifest[comic['id']] = image_url
         print(f"    -> {image_url}")
 
