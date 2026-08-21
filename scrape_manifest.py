@@ -249,7 +249,7 @@ def extract_image_url(page_url, source, verbose=False, no_date_url=None):
     print(f"    WARN: no image URL found at {page_url}")
     return None
 
-def scrape_date(config, date, manifest_dir='manifest', fallback_manifest_dir=None, verbose=False):
+def scrape_date(config, date, manifest_dir='manifest', fallback_manifest_dir=None, verbose=False, fallback_image_url=FALLBACK_IMAGE_URL):
     date_str = date.strftime('%Y-%m-%d')
     is_today = (date == datetime.date.today())
     print(f"\nScraping {date_str}" + (" [today — no-date URL strategy active]" if is_today else ""))
@@ -263,8 +263,8 @@ def scrape_date(config, date, manifest_dir='manifest', fallback_manifest_dir=Non
         no_date_url = build_no_date_url(comic) if (is_today and comic['source'] == 'gocomics') else None
         print(f"  {comic['id']}")
         image_url = extract_image_url(page_url, comic['source'], verbose=verbose, no_date_url=no_date_url)
-        if not image_url:
-            image_url = FALLBACK_IMAGE_URL
+        if not image_url and fallback_image_url:
+            image_url = fallback_image_url
             print(f"    Fallback: using static fallback image for {comic['id']}")
         manifest[comic['id']] = image_url
         print(f"    -> {image_url}")
@@ -317,8 +317,17 @@ def main():
         help='Optional secondary manifest directory to use for historical URL fallback.',
     )
     parser.add_argument('--verbose', action='store_true', help='Enable verbose scrape diagnostics.')
+    parser.add_argument(
+        '--fallback-image-url',
+        default=FALLBACK_IMAGE_URL,
+        help='Fallback image URL used when scrape fails. Use empty string to disable fallback and keep nulls.',
+    )
     parser.add_argument('legacy_date', nargs='*', help='Legacy positional date args: YYYY MM DD')
     args = parser.parse_args()
+
+    fallback_image_url = args.fallback_image_url.strip()
+    if fallback_image_url == '':
+        fallback_image_url = None
 
     config = load_config(args.config)
 
@@ -330,6 +339,7 @@ def main():
                 manifest_dir=args.manifest_dir,
                 fallback_manifest_dir=args.fallback_manifest_dir,
                 verbose=args.verbose,
+                fallback_image_url=fallback_image_url,
             )
     elif len(args.legacy_date) == 3:
         # Legacy Y M D positional args kept for GitHub Actions compatibility
@@ -340,6 +350,7 @@ def main():
             manifest_dir=args.manifest_dir,
             fallback_manifest_dir=args.fallback_manifest_dir,
             verbose=args.verbose,
+            fallback_image_url=fallback_image_url,
         )
     elif len(args.legacy_date) == 0:
         scrape_date(
@@ -348,6 +359,7 @@ def main():
             manifest_dir=args.manifest_dir,
             fallback_manifest_dir=args.fallback_manifest_dir,
             verbose=args.verbose,
+            fallback_image_url=fallback_image_url,
         )
     else:
         print("Usage: scrape_manifest.py [--backfill YYYY-MM-DD YYYY-MM-DD] [--config PATH] [--manifest-dir DIR] [--verbose] [YYYY MM DD]")

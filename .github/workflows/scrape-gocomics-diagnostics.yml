@@ -1,0 +1,121 @@
+name: GoComics Diagnostics (Isolated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode: direct_only disables fallback image to show true scrape failures"
+        required: true
+        default: "direct_only"
+        type: choice
+        options:
+          - direct_only
+          - fallback_enabled
+      date:
+        description: "Specific date to scrape (YYYY-MM-DD). Leave blank for today."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  gocomics-diagnostics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run isolated GoComics scrape
+        env:
+          TEST_DATE: ${{ github.event.inputs.date }}
+          MODE: ${{ github.event.inputs.mode }}
+          FALLBACK_IMAGE_URL: https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmpiYTNwdnhseThwZG1uOTh5MTU5M3JsbGFpY3JqYXZjc2h4YTZtdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uq6ILNBI6g3As/giphy.gif
+        run: |
+          mkdir -p manifest-diagnostics
+
+          date_args=""
+          if [ -n "$TEST_DATE" ]; then
+            IFS='-' read -r y m d <<< "$TEST_DATE"
+            date_args="$y $m $d"
+          fi
+
+          if [ "$MODE" = "direct_only" ]; then
+            python scrape_manifest.py \
+              --config configs/comics.gocomics-test.json \
+              --manifest-dir manifest-diagnostics \
+              --fallback-image-url "" \
+              --verbose $date_args | tee scrape-diagnostics.log
+          else
+            python scrape_manifest.py \
+              --config configs/comics.gocomics-test.json \
+              --manifest-dir manifest-diagnostics \
+              --fallback-image-url "$FALLBACK_IMAGE_URL" \
+              --verbose $date_args | tee scrape-diagnostics.log
+          fi
+
+      - name: Summarize diagnostics
+        env:
+          MODE: ${{ github.event.inputs.mode }}
+          FALLBACK_IMAGE_URL: https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmpiYTNwdnhseThwZG1uOTh5MTU5M3JsbGFpY3JqYXZjc2h4YTZtdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uq6ILNBI6g3As/giphy.gif
+        run: |
+          python - <<'PY'
+          import glob
+          import json
+          import os
+          import sys
+
+          files = sorted(glob.glob("manifest-diagnostics/????-??-??.json"))
+          if not files:
+              print("No diagnostics manifest generated.")
+              sys.exit(1)
+
+          latest = files[-1]
+          with open(latest, "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          total = len(data)
+          non_empty = 0
+          null_count = 0
+          fallback_count = 0
+          fallback_url = os.environ["FALLBACK_IMAGE_URL"]
+
+          for value in data.values():
+              if value is None:
+                  null_count += 1
+              elif isinstance(value, str) and value.strip():
+                  non_empty += 1
+                  if value == fallback_url:
+                      fallback_count += 1
+
+          success_ratio = (non_empty / total) if total else 0.0
+
+          print(f"mode={os.environ['MODE']}")
+          print(f"manifest={latest}")
+          print(f"total={total}")
+          print(f"non_empty={non_empty}")
+          print(f"null_count={null_count}")
+          print(f"fallback_count={fallback_count}")
+          print(f"success_ratio={success_ratio:.1%}")
+          PY
+
+      - name: Upload diagnostics artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gocomics-diagnostics
+          path: |
+            scrape-diagnostics.log
+            manifest-diagnostics/*.json
+          retention-days: 15
