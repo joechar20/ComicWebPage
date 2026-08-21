@@ -245,7 +245,7 @@ def extract_image_url(page_url, source, verbose=False, no_date_url=None):
     print(f"    WARN: no image URL found at {page_url}")
     return None
 
-def fallback_previous_manifest_url(comic_id, date, manifest_dirs, lookback_days=7):
+def fallback_previous_manifest_url(comic_id, date, manifest_dirs, lookback_days=30):
     """Use the most recent known URL for this comic when today's scrape is blocked."""
     for manifest_dir in manifest_dirs:
         for i in range(1, lookback_days + 1):
