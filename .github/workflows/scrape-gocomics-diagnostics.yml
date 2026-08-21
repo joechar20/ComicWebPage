@@ -43,7 +43,7 @@ jobs:
       - name: Run isolated GoComics scrape
         env:
           TEST_DATE: ${{ github.event.inputs.date }}
-          MODE: ${{ github.event.inputs.mode }}
+          MODE: ${{ github.event.inputs.mode || 'direct_only' }}
           FALLBACK_IMAGE_URL: https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmpiYTNwdnhseThwZG1uOTh5MTU5M3JsbGFpY3JqYXZjc2h4YTZtdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uq6ILNBI6g3As/giphy.gif
         run: |
           mkdir -p manifest-diagnostics
@@ -70,7 +70,7 @@ jobs:
 
       - name: Summarize diagnostics
         env:
-          MODE: ${{ github.event.inputs.mode }}
+          MODE: ${{ github.event.inputs.mode || 'direct_only' }}
           FALLBACK_IMAGE_URL: https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExcmpiYTNwdnhseThwZG1uOTh5MTU5M3JsbGFpY3JqYXZjc2h4YTZtdCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/uq6ILNBI6g3As/giphy.gif
         run: |
           python - <<'PY'
